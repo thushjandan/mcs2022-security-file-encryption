@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/thatisuday/commando"
+	algoType "github.com/thushjandan/mcs2022-security-file-encryption/pkg/algorithm"
 	"github.com/thushjandan/mcs2022-security-file-encryption/pkg/storage"
 	"github.com/thushjandan/mcs2022-security-file-encryption/pkg/symmetric"
 )
@@ -20,7 +21,8 @@ func main() {
 		AddFlag("algorithm,a", "symmetric algortihm to choose", commando.String, "gcm").
 		AddFlag("decrypt,d", "decrypt or encrypt. If flag is set, then file will be decrypted. Otherwise file will be encrypted", commando.Bool, false).
 		AddFlag("key,k", "passphrase used as key", commando.String, "default").
-		AddArgument("file", "input file", "./myFile").
+		AddFlag("input,i", "input file", commando.String, "./myFile").
+		AddFlag("output,o", "output file", commando.String, "./myFile.output").
 		SetAction(symmetricFileEncryptionAction)
 
 	commando.Register("asym").
@@ -37,52 +39,86 @@ func symmetricFileEncryptionAction(args map[string]commando.ArgValue, flags map[
 		os.Exit(1)
 	}
 	algorithm, _ := flags["algorithm"].GetString()
-	filePath := args["file"].Value
+	filePath, _ := flags["input"].GetString()
+	outputPath, _ := flags["output"].GetString()
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		fmt.Println("Invalid file path.")
 		os.Exit(1)
 	}
 	hashedKey := symmetric.TransformKey(key)
+	var err error
+	var plainText []byte
+	var cipherText []byte
+	var nonce []byte
+	var encryptionAlgorithm algoType.EncryptionAlgorithm
 	if isDecrypt, _ := flags["decrypt"].GetBool(); isDecrypt == true {
+		// Decryption
+		// Read ciphertext from file
+		encryptionAlgorithm, nonce, cipherText, err = storage.GetEncryptedFileContent(filePath)
+		if err != nil {
+			fmt.Printf("Cannot read file to decrypt. Error: %s\n", err.Error())
+			os.Exit(1)
+			return
+		}
 		if algorithm == "ecb" {
-			cipherText, err := storage.GetFileContent(filePath)
-			if err != nil {
-				fmt.Printf("Cannot read file to decrypt. Error: %s\n", err)
-			}
-			plainText, err := symmetric.DecryptECB(cipherText, hashedKey[:])
-			if err != nil {
-				fmt.Printf("Decryption failed.\n %s", err)
+			if encryptionAlgorithm != algoType.ECB_ALG {
+				fmt.Println("Input file is not encrypted with ECB. Choose the correct algorithm or do not define one.")
 				return
 			}
-			fmt.Printf("%b\n", plainText)
+			plainText, err = symmetric.DecryptECB(cipherText, hashedKey[:])
 		} else if algorithm == "ctr" {
-
+			if encryptionAlgorithm != algoType.CTR_ALG {
+				fmt.Println("Input file is not encrypted with CTR. Choose the correct algorithm or do not define one.")
+				return
+			}
+			plainText, err = symmetric.DecryptCTR(cipherText, hashedKey[:], nonce)
 		} else if algorithm == "gcm" {
+			if encryptionAlgorithm != algoType.GCM_ALG {
+				fmt.Println("Input file is not encrypted with ECB. Choose the correct algorithm or do not define one.")
+				return
+			}
+			plainText, err = symmetric.DecryptGCM(cipherText, hashedKey[:], nonce)
+		} else {
+			fmt.Println("Invalid algorithm given.")
+			return
+		}
+		if err != nil {
+			fmt.Printf("Decryption failed.\n %s", err.Error())
+			os.Exit(1)
+			return
+		}
+		err = os.WriteFile(outputPath, plainText, 0644)
 
+	} else {
+		// Encryption
+		encryptionAlgorithm := algoType.INVALID_ALG
+		plainText, err = storage.GetFileContent(filePath)
+		if err != nil {
+			fmt.Printf("Cannot read file to decrypt. Error: %s\n", err)
+			return
+		}
+		if algorithm == "ecb" {
+			encryptionAlgorithm = algoType.ECB_ALG
+			cipherText, err = symmetric.EncryptECB(plainText, hashedKey[:])
+		} else if algorithm == "ctr" {
+			encryptionAlgorithm = algoType.CTR_ALG
+			cipherText, nonce, err = symmetric.EncrpytCTR(plainText, hashedKey[:])
+		} else if algorithm == "gcm" {
+			encryptionAlgorithm = algoType.GCM_ALG
+			cipherText, nonce, err = symmetric.EncryptGCM(plainText, hashedKey[:])
 		} else {
 			fmt.Println("Invalid algorithm given.")
 			return
 		}
 
-	} else {
-		// Encryption
-		if algorithm == "ecb" {
-			plainText, err := storage.GetFileContent(filePath)
-			if err != nil {
-				fmt.Printf("Cannot read file to decrypt. Error: %s\n", err)
-			}
-			cipherText, err := symmetric.EncryptECB(plainText, hashedKey[:])
-			if err != nil {
-				fmt.Printf("Decryption failed.\n %s", err)
-				return
-			}
-			fmt.Println(cipherText)
-		} else if algorithm == "ctr" {
-
-		} else if algorithm == "gcm" {
-
-		} else {
-			fmt.Println("Invalid algorithm given.")
+		if err != nil {
+			fmt.Printf("Decryption failed.\n %s", err)
+			return
+		}
+		//err = os.WriteFile(outputPath, cipherText, 0644)
+		err = storage.WriteEncryptedFile(outputPath, encryptionAlgorithm, nonce, cipherText)
+		if err != nil {
+			fmt.Printf("Cannot write encrypted file. Error: %s\n", err)
 			return
 		}
 

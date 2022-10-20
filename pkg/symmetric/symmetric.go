@@ -12,6 +12,10 @@ import (
 	"github.com/andreburgaud/crypt2go/padding"
 )
 
+const (
+	NONCE_BYTES = 12
+)
+
 func TransformKey(key string) [sha256.Size]byte {
 	return sha256.Sum256([]byte(key))
 }
@@ -50,23 +54,23 @@ func DecryptECB(cipherText, key []byte) ([]byte, error) {
 	return plainText, err
 }
 
-func EncrpytCTR(plainText, key []byte) ([]byte, error) {
+func EncrpytCTR(plainText, key []byte) ([]byte, []byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ciphertext := make([]byte, aes.BlockSize+len(plainText))
 	iv := ciphertext[:aes.BlockSize]
 	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], plainText)
 
-	return ciphertext, nil
+	return ciphertext, iv, nil
 }
 
-func DecryptCTR(cipherText, key []byte) ([]byte, error) {
+func DecryptCTR(cipherText, key, iv []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -75,36 +79,32 @@ func DecryptCTR(cipherText, key []byte) ([]byte, error) {
 	if len(cipherText) < aes.BlockSize {
 		return nil, errors.New("ciphertext too short")
 	}
-	iv := plainText[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		return nil, err
-	}
 	stream := cipher.NewCTR(block, iv)
 	stream.XORKeyStream(plainText, cipherText[aes.BlockSize:])
 
 	return plainText, nil
 }
 
-func EncryptGCM(plainText, key []byte) ([]byte, error) {
+func EncryptGCM(plainText, key []byte) ([]byte, []byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
-	nonce := make([]byte, 12)
+	nonce := make([]byte, NONCE_BYTES)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	cipherText := aesgcm.Seal(nil, nonce, plainText, nil)
 
-	return cipherText, nil
+	return cipherText, nonce, nil
 }
 
 func DecryptGCM(cipherText, key, nonce []byte) ([]byte, error) {
