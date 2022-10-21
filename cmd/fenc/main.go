@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 
 	"github.com/thatisuday/commando"
 	algoType "github.com/thushjandan/mcs2022-security-file-encryption/pkg/algorithm"
+	"github.com/thushjandan/mcs2022-security-file-encryption/pkg/asymmetric"
 	"github.com/thushjandan/mcs2022-security-file-encryption/pkg/storage"
 	"github.com/thushjandan/mcs2022-security-file-encryption/pkg/symmetric"
 )
@@ -27,7 +29,17 @@ func main() {
 
 	commando.Register("asym").
 		SetShortDescription("file encryption using asymmetric algortihm").
-		AddFlag("algorithm,a", "asymmetric algorthm to choose", commando.String, "rsa")
+		AddFlag("algorithm,a", "asymmetric algorthm to choose", commando.String, "rsa").
+		AddFlag("decrypt,d", "decrypt or encrypt. If flag is set, then file will be decrypted. Otherwise file will be encrypted", commando.Bool, false).
+		AddFlag("private,d", "private key", commando.String, "./myKey.key").
+		AddFlag("public,e", "private key", commando.String, "./myKey.pub").
+		AddFlag("input,i", "input file", commando.String, "./myFile").
+		AddFlag("output,o", "output file", commando.String, "./myFile.output").
+		SetAction(asymmetricFileEncryptionAction)
+	commando.Register("generate").
+		SetShortDescription("Generates private public key pair").
+		AddFlag("name,n", "file name of newly generates key pairs", commando.String, "myKey").
+		SetAction(generateKeyAction)
 	commando.Parse(nil)
 
 }
@@ -126,5 +138,101 @@ func symmetricFileEncryptionAction(args map[string]commando.ArgValue, flags map[
 }
 
 func asymmetricFileEncryptionAction(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
+	privateKeyPath, _ := flags["private"].GetString()
+	publicKeyPath, _ := flags["public"].GetString()
+	inputFilePath, _ := flags["input"].GetString()
+	outputFilePath, _ := flags["output"].GetString()
+	if isDecrypt, _ := flags["decrypt"].GetBool(); isDecrypt == true {
+		// Decrypt
+		privateKey, err := storage.LoadRSAPrivateKey(privateKeyPath)
+		if err != nil {
+			fmt.Printf("Cannot load private key from file. Error %s\n", err)
+			return
+		}
+		encryptedContent, err := storage.ReadRSAEncryptedFile(inputFilePath)
+		encryptedKey := &big.Int{}
+		encryptedKey.SetBytes(encryptedContent.EncryptedKey)
+		plainText, err := asymmetric.DecryptFile(encryptedContent.EncryptedContent, privateKey, encryptedKey, encryptedContent.Nonce)
+		if err != nil {
+			fmt.Printf("Cannot decrypt file. Error %s\n", err)
+			return
+		}
+		err = os.WriteFile(outputFilePath, plainText, 0644)
+		if err != nil {
+			fmt.Printf("Cannot write decrypted file. Error %s\n", err)
+			return
+		}
 
+	} else {
+		// Encrypt
+		publicKey, err := storage.LoadRSAPublicKey(publicKeyPath)
+		if err != nil {
+			fmt.Printf("Cannot load public key from file. Error %s\n", err)
+			return
+		}
+		plainText, err := storage.GetFileContent(inputFilePath)
+		if err != nil {
+			fmt.Printf("Cannot read file to decrypt. Error: %s\n", err)
+			return
+		}
+		cipherText, nonce, encryptedKey, err := asymmetric.EncryptFile(plainText, publicKey)
+		if err != nil {
+			fmt.Printf("Cannot encrypt file. Error: %s\n", err)
+			return
+		}
+		payload := &storage.GobRSAEncrypted{
+			EncryptedContent: cipherText,
+			EncryptedKey:     encryptedKey.Bytes(),
+			Nonce:            nonce,
+		}
+		err = storage.WriteRSAEncryptedFile(outputFilePath, payload)
+		if err != nil {
+			fmt.Printf("Cannot write file. Error: %s\n", err)
+			return
+		}
+	}
+
+}
+
+func generateKeyAction(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
+	fileName, _ := flags["name"].GetString()
+	privateKey, publicKey, err := asymmetric.GenerateKey()
+	if err != nil {
+		fmt.Printf("Cannot generate a new key pair. Error %s\n", err)
+		return
+	}
+	marshalledD, err := privateKey.D.MarshalText()
+	if err != nil {
+		fmt.Printf("Cannot transform private key to store locally. Error %s\n", err)
+		return
+	}
+	marshalledN, err := privateKey.N.MarshalText()
+	if err != nil {
+		fmt.Printf("Cannot transform private key to store locally. Error %s\n", err)
+		return
+	}
+	marshalledD = append(marshalledD, '.')
+	transformedPrivateKey := append(marshalledD, marshalledN...)
+	marshalledE, err := publicKey.E.MarshalText()
+	if err != nil {
+		fmt.Printf("Cannot transform private key to store locally. Error %s\n", err)
+		return
+	}
+	marshalledN, err = publicKey.N.MarshalText()
+	if err != nil {
+		fmt.Printf("Cannot transform private key to store locally. Error %s\n", err)
+		return
+	}
+	marshalledE = append(marshalledE, '.')
+	transformedPublicKey := append(marshalledE, marshalledN...)
+	err = os.WriteFile(fileName+".key", transformedPrivateKey, 0600)
+	if err != nil {
+		fmt.Printf("Cannot write private key to file. Error %s\n", err)
+		return
+	}
+	err = os.WriteFile(fileName+".pub", transformedPublicKey, 0644)
+	if err != nil {
+		fmt.Printf("Cannot write public key to file. Error %s\n", err)
+		return
+	}
 }
