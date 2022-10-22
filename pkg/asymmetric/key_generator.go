@@ -22,8 +22,7 @@ func chooseE(totient *big.Int) (*big.Int, error) {
 		if err != nil {
 			return nil, err
 		}
-		z := big.Int{}
-		if z.GCD(nil, nil, e, totient).Cmp(one) == 0 {
+		if e.Cmp(one) == 1 && e.Cmp(totient) < 0 && new(big.Int).GCD(nil, nil, e, totient).Cmp(one) == 0 {
 			return e, nil
 		}
 	}
@@ -31,11 +30,11 @@ func chooseE(totient *big.Int) (*big.Int, error) {
 }
 
 func GenerateKey() (*RSAPrivateKey, *RSAPublicKey, error) {
-	p, err := rand.Prime(rand.Reader, 1000)
+	p, err := rand.Prime(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
 	}
-	q, err := rand.Prime(rand.Reader, 1000)
+	q, err := rand.Prime(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,10 +51,10 @@ func GenerateKey() (*RSAPrivateKey, *RSAPublicKey, error) {
 	}
 	// Calculate d = e^−1 mod totient(n)
 	// modular multiplicative inverse
-	d := big.Int{}
+	d := &big.Int{}
 	d.ModInverse(e, totient)
 	privateKey := &RSAPrivateKey{
-		D: e,
+		D: d,
 		N: n,
 	}
 	publicKey := &RSAPublicKey{

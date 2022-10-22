@@ -31,8 +31,8 @@ func main() {
 		SetShortDescription("file encryption using asymmetric algortihm").
 		AddFlag("algorithm,a", "asymmetric algorthm to choose", commando.String, "rsa").
 		AddFlag("decrypt,d", "decrypt or encrypt. If flag is set, then file will be decrypted. Otherwise file will be encrypted", commando.Bool, false).
-		AddFlag("private,d", "private key", commando.String, "./myKey.key").
-		AddFlag("public,e", "private key", commando.String, "./myKey.pub").
+		AddFlag("private,k", "private key", commando.String, "./myKey.key").
+		AddFlag("public,p", "private key", commando.String, "./myKey.pub").
 		AddFlag("input,i", "input file", commando.String, "./myFile").
 		AddFlag("output,o", "output file", commando.String, "./myFile.output").
 		SetAction(asymmetricFileEncryptionAction)
