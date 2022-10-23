@@ -15,6 +15,7 @@ type RSAPrivateKey struct {
 	N *big.Int
 }
 
+// Find a suitable E
 func chooseE(totient *big.Int) (*big.Int, error) {
 	one := big.NewInt(1)
 	for {
@@ -26,14 +27,15 @@ func chooseE(totient *big.Int) (*big.Int, error) {
 			return e, nil
 		}
 	}
-
 }
 
 func GenerateKey() (*RSAPrivateKey, *RSAPublicKey, error) {
+	// Find p with a size of 2048
 	p, err := rand.Prime(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
 	}
+	// Find q with a size of 2048
 	q, err := rand.Prime(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err
@@ -53,6 +55,7 @@ func GenerateKey() (*RSAPrivateKey, *RSAPublicKey, error) {
 	// modular multiplicative inverse
 	d := &big.Int{}
 	d.ModInverse(e, totient)
+
 	privateKey := &RSAPrivateKey{
 		D: d,
 		N: n,

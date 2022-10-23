@@ -9,7 +9,7 @@ import (
 
 func EncryptFile(plainText []byte, publicKey *RSAPublicKey) ([]byte, []byte, *big.Int, error) {
 	// Generate new symmetric key
-	// Generate 256-bit key
+	// Generate a random 256-bit key
 	newSymKey := make([]byte, 32)
 	_, err := rand.Read(newSymKey)
 	// Convert key to bigint
@@ -36,7 +36,9 @@ func EncryptFile(plainText []byte, publicKey *RSAPublicKey) ([]byte, []byte, *bi
 }
 
 func DecryptFile(cipherText []byte, privateKey *RSAPrivateKey, encryptedSymmetricKey *big.Int, nonce []byte) ([]byte, error) {
+	// Decrypt symmetric key
 	m := decryptSymmetricKey(privateKey, encryptedSymmetricKey)
+	// Decrypt file content
 	plaintext, err := symmetric.DecryptGCM(cipherText, m.Bytes(), nonce)
 	if err != nil {
 		return nil, err

@@ -26,6 +26,11 @@ func GetFileContent(path string) ([]byte, error) {
 	return fileContent, nil
 }
 
+// Read symmetric encrypted file
+// 1 byte (uint8) for algorithm type
+// 8 byte for nonce length int64
+// x byte for nonce
+// rest of the file contains the encrypted payload
 func GetEncryptedFileContent(path string) (algorithm.EncryptionAlgorithm, []byte, []byte, error) {
 	fp, err := os.Open(path)
 	defer fp.Close()
@@ -33,6 +38,7 @@ func GetEncryptedFileContent(path string) (algorithm.EncryptionAlgorithm, []byte
 	if err != nil {
 		return algorithm.INVALID_ALG, nil, nil, err
 	}
+	// Read header => algorithm type and nonce size
 	buf := make([]byte, 9)
 	readCount, err := fp.ReadAt(buf, 0)
 	if err != nil {
@@ -45,12 +51,17 @@ func GetEncryptedFileContent(path string) (algorithm.EncryptionAlgorithm, []byte
 	var rEncryptionAlgorithm uint8
 	var rNonceLength int64
 	var nonce []byte
+	// Read algorithm type from file
 	binary.Read(bufReader, binary.LittleEndian, &rEncryptionAlgorithm)
+	// validate the algorithm type
 	if rEncryptionAlgorithm < 1 || rEncryptionAlgorithm > 4 {
 		return algorithm.INVALID_ALG, nil, nil, errors.New("Invalid encrypted file. Invalid encryption algorithm type.")
 	}
+	// Read nonce size
 	binary.Read(bufReader, binary.LittleEndian, &rNonceLength)
+	// if nonce length bigger than 0, then we have to read the nonce value from file
 	if rNonceLength > 0 {
+		// Read nonce value
 		nonce = make([]byte, rNonceLength)
 		readCount, err = fp.ReadAt(nonce, 9)
 		if err != nil {
@@ -58,10 +69,12 @@ func GetEncryptedFileContent(path string) (algorithm.EncryptionAlgorithm, []byte
 		}
 	}
 
+	// Get total file size
 	fi, err := os.Stat(path)
 	if err != nil {
 		return algorithm.INVALID_ALG, nil, nil, err
 	}
+	// Read the encrypted payload
 	data := make([]byte, fi.Size()-(int64(rNonceLength)+9))
 	readCount, err = fp.ReadAt(data, int64(rNonceLength)+9)
 	if err != nil {
@@ -78,6 +91,7 @@ func WriteEncryptedFile(path string, encalg algorithm.EncryptionAlgorithm, nonce
 	if err != nil {
 		return err
 	}
+	// prepare file header
 	buf := new(bytes.Buffer)
 	nonceLength := int64(len(nonce))
 	binary.Write(buf, binary.LittleEndian, encalg)
@@ -93,10 +107,12 @@ func WriteEncryptedFile(path string, encalg algorithm.EncryptionAlgorithm, nonce
 		return err
 	}
 
+	// Write file header
 	_, err = fp.WriteAt(buf.Bytes(), 0)
 	if err != nil {
 		return err
 	}
+	// Write cipher text
 	_, err = fp.WriteAt(data, int64(offset))
 	if err != nil {
 		return err
@@ -105,6 +121,7 @@ func WriteEncryptedFile(path string, encalg algorithm.EncryptionAlgorithm, nonce
 
 }
 
+// Read a RSA key from file
 func loadRSAKey(filepath string) ([][]byte, error) {
 	content, err := os.ReadFile(filepath)
 	if err != nil {
@@ -125,6 +142,7 @@ func LoadRSAPublicKey(filepath string) (*asymmetric.RSAPublicKey, error) {
 		N: &big.Int{},
 	}
 
+	// Transform byte array back to BigInt
 	err = publicKey.E.UnmarshalText(splittedContent[0])
 	if err != nil {
 		return nil, err
@@ -149,6 +167,7 @@ func LoadRSAPrivateKey(filepath string) (*asymmetric.RSAPrivateKey, error) {
 		N: &big.Int{},
 	}
 
+	// Transform byte array back to BigInt
 	err = privateKey.D.UnmarshalText(splittedContent[0])
 	if err != nil {
 		return nil, err
@@ -162,6 +181,7 @@ func LoadRSAPrivateKey(filepath string) (*asymmetric.RSAPrivateKey, error) {
 	return privateKey, nil
 }
 
+// Serizalize a encrypted payload as GOB
 func WriteRSAEncryptedFile(filepath string, data *GobRSAEncrypted) error {
 	var writeBuffer bytes.Buffer
 	fileEncoder := gob.NewEncoder(&writeBuffer)
@@ -177,6 +197,7 @@ func WriteRSAEncryptedFile(filepath string, data *GobRSAEncrypted) error {
 	return nil
 }
 
+// Deserialize a RSA encrypted file, which is in GOB format
 func ReadRSAEncryptedFile(filepath string) (*GobRSAEncrypted, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {

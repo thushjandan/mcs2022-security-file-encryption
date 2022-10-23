@@ -2,6 +2,7 @@ package algorithm
 
 type EncryptionAlgorithm uint8
 
+// Enum for algorithm types
 const (
 	INVALID_ALG EncryptionAlgorithm = 0
 	ECB_ALG                         = 1
