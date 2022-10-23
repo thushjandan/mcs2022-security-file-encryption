@@ -1,6 +1,10 @@
 # Security Assignment #1
 This project implements a file encryption command line application, which encrypts & decrypts files with 3 different symmetric block ciphers and with textbook RSA.
 
+# Download precompiled binaries
+Precompiled binaries for several OS can be found here: [Github Releases](https://github.com/thushjandan/mcs2022-security-file-encryption/releases/tag/v1.0.0)
+Only linux_amd64 binary has been tested.
+
 # Build on Linux or Windows
 ```bash
 # Download dependencies
@@ -49,13 +53,17 @@ Decrypt file with AES-GCM and shared key supersecretkey
 ```
 
 ## RSA Key generation
-Generates a public/private key pair
+Generates a public/private key pair with bitsize of 2048 bits
 ```
 ./fenc generate
 ```
-Generates a public/private key pair with a defined filename
+Generates a public/private key pair with bitsize of 4096 bits
 ```
-./fenc generate -n supersecret
+./fenc generate -b 4096
+```
+Generates a public/private key pair with a defined filename and bitsize of 4096
+```
+./fenc generate -n supersecret -b 4096
 ```
 ## Encrypt file with textbook RSA
 Encrypt file with public key myKey.pub
