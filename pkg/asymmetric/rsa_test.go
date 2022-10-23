@@ -6,7 +6,7 @@ import (
 )
 
 func TestRSAKeyGeneration(t *testing.T) {
-	privateKey, publicKey, err := GenerateKey()
+	privateKey, publicKey, err := GenerateKey(2048)
 	if err != nil {
 		t.Fatalf(`Got an error: %v`, err)
 	}
@@ -17,7 +17,7 @@ func TestRSAKeyGeneration(t *testing.T) {
 
 func TestRSA(t *testing.T) {
 	plainText := []byte("Hello World!")
-	privateKey, publicKey, err := GenerateKey()
+	privateKey, publicKey, err := GenerateKey(2048)
 	if err != nil {
 		t.Fatalf(`Got an error: %v`, err)
 	}

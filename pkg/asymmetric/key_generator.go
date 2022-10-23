@@ -2,6 +2,7 @@ package asymmetric
 
 import (
 	"crypto/rand"
+	"errors"
 	"math/big"
 )
 
@@ -13,6 +14,12 @@ type RSAPublicKey struct {
 type RSAPrivateKey struct {
 	D *big.Int
 	N *big.Int
+}
+
+var validKeySize = map[int]bool{
+	2048: true,
+	4096: true,
+	8192: true,
 }
 
 // Find a suitable E
@@ -29,14 +36,18 @@ func chooseE(totient *big.Int) (*big.Int, error) {
 	}
 }
 
-func GenerateKey() (*RSAPrivateKey, *RSAPublicKey, error) {
-	// Find p with a size of 2048
-	p, err := rand.Prime(rand.Reader, 2048)
+func GenerateKey(keysize int) (*RSAPrivateKey, *RSAPublicKey, error) {
+	if _, ok := validKeySize[keysize]; !ok {
+		return nil, nil, errors.New("Invalid key size. Only 2048, 4096 & 8192 are allowed")
+	}
+
+	// Find p with a size of keysize
+	p, err := rand.Prime(rand.Reader, keysize)
 	if err != nil {
 		return nil, nil, err
 	}
-	// Find q with a size of 2048
-	q, err := rand.Prime(rand.Reader, 2048)
+	// Find q with a size of keysize
+	q, err := rand.Prime(rand.Reader, keysize)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -185,7 +185,8 @@ func AsymmetricFileEncryptionAction(args map[string]commando.ArgValue, flags map
 
 func GenerateKeyAction(args map[string]commando.ArgValue, flags map[string]commando.FlagValue) {
 	fileName, _ := flags["name"].GetString()
-	privateKey, publicKey, err := asymmetric.GenerateKey()
+	keySize, _ := flags["bits"].GetInt()
+	privateKey, publicKey, err := asymmetric.GenerateKey(keySize)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Cannot generate a new key pair. Error %s\n", err)
 		return

@@ -36,6 +36,7 @@ func main() {
 	commando.Register("generate").
 		SetShortDescription("Generates private public key pair").
 		AddFlag("name,n", "file name of newly generates key pairs", commando.String, "myKey").
+		AddFlag("bits,b", "bit size of the key", commando.Int, 2048).
 		SetAction(controller.GenerateKeyAction)
 	commando.Parse(nil)
 
